@@ -8,12 +8,12 @@ categories=["'Earth sciences'"]
 item_ids_full,item_ids=itemids_for_categories(categories)
 
 #Fetch metadata for each item id and write it to a json file
-#item_metadata,error_list,categories_metadata,jsonfilename=figshare_categorystatistics(item_ids_full)
 item_metadata,error_list,categories_metadata=figshare_categorystatistics(item_ids_full)
-quit()
+
 keys_to_keep = ['figshare_url','citation','categories','id','doi','handle','url', 'published_date']#, 'views','downloads']
 descriptor='figshare-statistics-category'
 jsonfilename=descriptor + '-full_records-'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.json'
+
 #Convert json file to csv file: all metadata
 with open(jsonfilename, encoding='utf-8') as inputfile: 
   df = pd.read_json(inputfile)
@@ -23,5 +23,4 @@ df.to_csv('allMetadataInFigshare_report_datasets'+str(datetime.datetime.now().st
 df.to_csv('LimitedMetadataInFigshare_report_datasets'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.csv', columns=keys_to_keep, index=False)
 
 #Gather figshare statistics for each item id and write it to a csv file:
-
 fetch_figshare_statistics('LimitedMetadataInFigshare_report_datasets'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.csv')
