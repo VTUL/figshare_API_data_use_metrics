@@ -5,11 +5,12 @@ import json as json
 import datetime
 import pandas as pd
 import numpy as np
+import os
 
-def itemids_for_categories():
+def itemids_for_categories(categories):
   BASE_URL = 'https://api.figshare.com/v2'
   #categories=["'Earth sciences'"]
-  categories=["'25756'"]
+  #categories=["'25756'"]
 #Gather basic metadata for items (articles) that meet your search criteria
   results = [] #create a blank list
   for i in categories:
@@ -59,19 +60,12 @@ def figshare_categorystatistics(itemList):
             except:
                 metadata['posted_year'] = ''
 
-            views = json.loads(requests.get('https://stats.figshare.com/total/views/article/' + str(id)).content) #this gives 41
-            downloads = json.loads(requests.get('https://stats.figshare.com/total/downloads/article/' + str(id)).content) #this gives 5
-            #Add views and downloads to the full metadata record and add to the main list
-            metadata['views'] = views['totals'] 
-            metadata['downloads'] = downloads['totals'] 
-
             item_metadata.append(metadata)
 
             cats = metadata['categories'] 
             for c in cats:
               c['item_id'] = id 
-              categories_metadata.append(c)
-            
+              categories_metadata.append(c)          
 
         else:  
           e = {}
@@ -84,8 +78,9 @@ def figshare_categorystatistics(itemList):
 
 
 
-        descriptor='figshare-statistics-earth-sciences-category'
-
+        #descriptor='figshare-statistics-earth-sciences-category'
+        descriptor='figshare-statistics-category'
+        #jsonfilename=descriptor + '-full_records-'+str(datetime.datetime.now().strftime("%Y-%m-%d"))
         with open(descriptor + '-full_records-'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.json', 'w') as f:
            json.dump(item_metadata, f)
 
@@ -94,4 +89,51 @@ def figshare_categorystatistics(itemList):
           json.dump(error_list, f)
 
     print('Done.',len(item_metadata),"items detailed")
-    return item_metadata,error_list,categories_metadata
+    return item_metadata,error_list,categories_metadata#,jsonfilename
+
+def fetch_figshare_statistics(file_path):
+    df = pd.read_csv(file_path)
+    print(df)
+
+    df['idstr'] = df['id'].astype(str)
+    df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
+    print('https://stats.figshare.com/' + df['institute'] + '/total/views/article/' + df['idstr'])
+    df['inst_views'] = np.nan
+    df['inst_downloads'] = np.nan
+    df['stats_views_url'] = 'np.nan'
+    df['stats_downloads_url'] = 'np.nan'
+    instviews = []
+    instdownloads = []
+
+    for i in range(len(df['id'])):
+        if df['institute'][i] == 'figshare':
+            views = json.loads(requests.get('https://stats.figshare.com/total/views/article/' + df['idstr'][i]).content)
+            downs = json.loads(requests.get('https://stats.figshare.com/total/downloads/article/' + df['idstr'][i]).content)
+            print(' is figshare, url: ', 'https://stats.figshare.com/total/views/article/' + df['idstr'][i], views.get('totals'))
+            df['stats_views_url'][i] = 'https://stats.figshare.com/total/views/article/' + df['idstr'][i]
+            df['stats_downloads_url'][i] = 'https://stats.figshare.com/total/downloads/article/' + df['idstr'][i]
+        else:
+            views = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]).content)
+            downs = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]).content)
+            df['stats_views_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]
+            df['stats_downloads_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]
+        instviews.append(views)
+        instdownloads.append(downs)
+        print(views, views.get('totals'))
+        print(downs, downs.get('totals'))
+        df['inst_views'][i] = views.get('totals')
+        df['inst_downloads'][i] = downs.get('totals')
+
+        print('len is', len(df['id']), 'i is ', i)
+
+    df.to_csv('views_and_downloads_figshare_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv', encoding='utf-8', index=False)
+    print('done')
+
+def closeFile(file_path):
+    try:
+        os.system('TASKKILL /F /IM '+ file_path)
+    except Exception:
+        print("All closed")
+
+#closeFile()
+#fetch_figshare_statistics("c:/Users/padma/anaconda3/envs/curation/LimitedMetadataInEarthSciencesCategory.csv")
