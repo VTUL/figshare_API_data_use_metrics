@@ -1,0 +1,9 @@
+views*.csv
+all*.csv
+Limited*.csv
+item*.csv
+//Remove all csv files from git
+*.csv
+git rm --cached *.csv
+ __pycache__/
+git rm -r --cached __pycache__

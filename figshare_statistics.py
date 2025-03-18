@@ -1,12 +1,56 @@
 import pandas as pd
 import datetime
 from figshare_statistics_for_categories import itemids_for_categories,figshare_categorystatistics, fetch_figshare_statistics, fetch_figshare_statistics
-categories=["'Earth sciences'"]
-#categories=["'25756'"]
-#categories=["'25720'","'25723'","'25726'","'25729'","'25732'","'25735'","'25738'","'25741'","'25744'","'25747'","'25750'","'25753'","'25756'","'25759'","'25762'","'25765'","'25768'","'25771'","'25774'","'25777'","'25780'","'25783'","'25786'","'25789'","'25792'","'25795'","'25798'","'25801'","'25804'","'25807'","'25810'","'25813'","'25816'","'25819'","'25822'","'25825'","'25828'","'25831'","'25834'","'25837'","'25840'","'25843'","'25846'","'25849'","'25852'","'25855'","'25858'","'25861'","'25864'","'25867'","'25870'","'25873'","'25876'","'25879'","'25882'","'25885'","'25888'","'25891'","'25894'","'25897'","'25900'","'25903'","'25906'","'25909'","'25912'","'25915'","'25918'","'25921'","'25924'","'25927'","'25930'","'25933'","'25936'","'25939'",25942'"
-#Gather item ids for each category and write it to a csv file
-item_ids_full,item_ids=itemids_for_categories(categories)
 
+#Gather item ids for each category and write it to a csv file
+
+#read the categories numbers and match it with the names provided in Figshare_categories.csv:
+file_path = 'C:/Users/padma/anaconda3/envs/figshare_statistics/figshare_statistics_categories/Figshare_categories.csv'
+# Define the column names
+column_names = ['categoryItemNumber', 'MainCategoryNumber', 'MainCategoryName-Number', 'SubCategoryName','x','y']  # Replace with actual column names
+
+df = pd.read_csv(file_path,names=column_names)
+
+# Fill empty fields in 'categoryItemNumber' with the value above
+df['categoryItemNumber'].fillna(method='ffill', inplace=True)
+
+# Fill empty fields in 'MainCategoryNumber' with the value above
+df['MainCategoryNumber'].fillna(method='ffill', inplace=True)
+
+# Save the updated DataFrame to a CSV file
+df.to_csv('Updated_Figshare_categories.csv', index=False)
+
+#categories=['25777']
+#categories=[25720,25723,25726,25729,25732,25735,25738,25741,25744,25747,25750,25753,25756,25759,25762,25765,25768,25771,25774,25777]
+category_search='main_category'
+#category_search='sub_category'
+#####################
+##Match with the sub category number:
+## Define the sub category to find
+if category_search=='sub_category':
+  category_to_find = '300101'
+## Filter the DataFrame to find the rows that match the subcategory
+  filtered_df = df[df['categoryItemNumber'] == category_to_find]
+#####################
+##Match with the main category number:
+## Define the main category to find
+if category_search=='main_category':
+  category_to_find = '3704'
+## Filter the DataFrame to find the rows that match the main category
+  filtered_df = df[df['MainCategoryNumber'] == category_to_find]
+# Print the filtered DataFrame
+print(filtered_df)
+
+# If you need to use the filtered DataFrame for further processing
+#categories = filtered_df['categoryItemNumber'].tolist()
+categories = filtered_df['SubCategoryName'].tolist()
+
+# Remove NaN values from the 'categories' list
+categories = [category for category in categories if pd.notna(category)]
+
+#####################
+item_ids_full,item_ids=itemids_for_categories(categories)
+#print("**********json is*******************",)
 #Fetch metadata for each item id and write it to a json file
 item_metadata,error_list,categories_metadata=figshare_categorystatistics(item_ids_full)
 
