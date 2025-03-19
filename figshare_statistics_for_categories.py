@@ -19,13 +19,14 @@ def itemids_for_categories(categories):
     y = json.loads(query) #Figshare API requires json paramaters
     #The number of results is unknown but you can collect up to 9,000 results. This sets the page size to 1000 results and calls the API 
     #to retrieve results
-    for j in range(1,10000): #Collect 5 pages of results
+    #for j in range(1,10000): #Collect 5 pages of results
+    for j in range(1,10): #Collect 5 pages of results
         r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
         print('page',j,'for term',i,'collected successfully')
         results.extend(r) #add the retrieved records to the list of records
 #See the number of items
   print(len(results),'items retrieved total')
-
+  print('result is ',results)
 #Create a list of all the item ids
   item_ids_full = [item['id'] for item in results]  
 

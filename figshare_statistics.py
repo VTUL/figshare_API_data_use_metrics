@@ -25,6 +25,11 @@ df.to_csv('Updated_Figshare_categories.csv', index=False)
 category_search='main_category'
 #category_search='sub_category'
 #####################
+##Match with the main category number:
+## Define the main category to find
+if category_search=='main_category':
+  category_to_find = '3704'
+
 ##Match with the sub category number:
 ## Define the sub category to find
 if category_search=='sub_category':
@@ -32,10 +37,8 @@ if category_search=='sub_category':
 ## Filter the DataFrame to find the rows that match the subcategory
   filtered_df = df[df['categoryItemNumber'] == category_to_find]
 #####################
-##Match with the main category number:
-## Define the main category to find
-if category_search=='main_category':
-  category_to_find = '3704'
+
+
 ## Filter the DataFrame to find the rows that match the main category
   filtered_df = df[df['MainCategoryNumber'] == category_to_find]
 # Print the filtered DataFrame

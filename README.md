@@ -13,6 +13,8 @@ These codes help get figshare statistics for specified categories. They were gat
 
 - Go to [category numbers matching with category names figshare dataset](https://figshare.com/articles/dataset/Fields_of_Research_FoR_Classification/10305443/1?file=35317927) and download the Figshare categories as a csv file, name it Figshare_categories.csv
 - Open figshare_statistics.py and change the file path of the Figshare categories csv file in 'file_path'
+- Enter the category_search='main_category' or category_search='sub_category' based on the Figshare_categories.csv file on line 25. 'main_category' corresponds to column 2, and 'sub_category' corresponds to column 3 category ids.
+- Enter category_to_find = '3704' on line 31 for 'main_category' or line 36 for 'sub_category'
 - Run figshare_statistics.py
 - This will generate a csv file with views and downloads : views_and_downloads_figshare_[current_date]
 - Two other csv files are also generated:
