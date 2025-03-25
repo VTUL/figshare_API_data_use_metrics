@@ -29,6 +29,8 @@ category_search='main_category'
 ## Define the main category to find
 if category_search=='main_category':
   category_to_find = '3704'
+## Filter the DataFrame to find the rows that match the main category
+  filtered_df = df[df['MainCategoryNumber'] == category_to_find]
 
 ##Match with the sub category number:
 ## Define the sub category to find
@@ -37,10 +39,6 @@ if category_search=='sub_category':
 ## Filter the DataFrame to find the rows that match the subcategory
   filtered_df = df[df['categoryItemNumber'] == category_to_find]
 #####################
-
-
-## Filter the DataFrame to find the rows that match the main category
-  filtered_df = df[df['MainCategoryNumber'] == category_to_find]
 # Print the filtered DataFrame
 print(filtered_df)
 
@@ -57,7 +55,7 @@ item_ids_full,item_ids=itemids_for_categories(categories)
 #Fetch metadata for each item id and write it to a json file
 item_metadata,error_list,categories_metadata=figshare_categorystatistics(item_ids_full)
 
-keys_to_keep = ['figshare_url','citation','categories','id','doi','handle','url', 'published_date']#, 'views','downloads']
+keys_to_keep = ['figshare_url','citation','categories','id','doi','handle','url', 'published_date','defined_type_name']#, 'views','downloads']
 descriptor='figshare-statistics-category'
 jsonfilename=descriptor + '-full_records-'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.json'
 
