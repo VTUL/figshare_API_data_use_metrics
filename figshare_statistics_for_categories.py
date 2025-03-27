@@ -9,36 +9,46 @@ import os
 
 def itemids_for_categories(categories):
     BASE_URL = 'https://api.figshare.com/v2'
-    #categories=["'Earth sciences'"]
-    #categories=["'25756'"]
-#Gather basic metadata for items (articles) that meet your search criteria
     results = []  # create a blank list
-    for i in categories:
-        query = '{"search_for":":category: ' + i + '"}'
-        print('query is',query)
-        y = json.loads(query) #Figshare API requires json paramaters
-        #The number of results is unknown but you can collect up to 9,000 results. This sets the page size to 1000 results and calls the API 
-        #to retrieve results
-        #for j in range(1,10000): #Collect 5 pages of results
-        for j in range(1,10): #Collect 5 pages of results
-            r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
-            print('page',j,'for term',i,'collected successfully')
-            results.extend(r)  # add the retrieved records to the list of records
-#See the number of items
-    print(len(results),'items retrieved total')
-    print('result is ',results)
-#Create a list of all the item ids where defined_type_name is "dataset"
-    item_ids_full = [item['id'] for item in results if item.get('defined_type_name') == 'dataset']  
 
-#Remove duplicates by converting to a dictionary and back to a list
-    item_ids = list( dict.fromkeys(item_ids_full) ) 
-    print(len(item_ids_full)-len(item_ids),'duplicate records removed,',len(item_ids),'unique records remain')
-    print('List of item ids created, called item_ids', item_ids_full)
-    outfile = open('item_ids'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.csv','w')
+    for i in categories:
+        query = '{"search_for":":category: ' + i + ' AND defined_type_name:dataset AND published_date:[2024-01-01 TO *]"}'
+        print('query is', query)
+        y = json.loads(query)  # Figshare API requires JSON parameters
+        # Get the total number of pages
+        for j in range(1, 50):
+            r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
+            #print('Page', j, 'for term', i, 'collected successfully','JSON LOADS IS ',r)
+            results.extend(r)  # Add the retrieved records to the list of records
+    # Filter results to remove any strings or non-dictionary elements
+    results = [item for item in results if isinstance(item, dict)]
+    # Save all results to a JSON file
+    with open('all_results_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.json', 'w') as f:
+        json.dump(results, f)
+
+    # See the number of items
+    print('items retrieved total',len(results))
+    print('**********************Result is********************************', results)
+    print('**********************type(results) is********************************', type(results))
+    #Create a list of all the item ids
+    item_ids_full = [item['id'] for item in results]
+
+   # print('item_ids_full is ', item_ids_full)
+    # Create a list of all the item IDs where defined_type_name is "dataset"
+   # item_ids_full = [item['id'] for item in results]
+    #print('item_ids_full for item type dataset is', item_ids_full)
+    # Remove duplicates by converting to a dictionary and back to a list
+    item_ids = list(dict.fromkeys(item_ids_full))
+    print(len(item_ids_full) - len(item_ids), 'duplicate records removed,', len(item_ids), 'unique records remain')
+    print('List of item IDs created, called item_ids', item_ids_full)
+
+    # Save the item IDs to a CSV file
+    outfile = open('item_ids' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv', 'w')
     out = csv.writer(outfile)
     out.writerows(map(lambda x: [x], item_ids_full))
     outfile.close()
-    return item_ids_full,item_ids
+
+    return item_ids_full, item_ids
 
 def figshare_categorystatistics(itemList):
     item_metadata = []

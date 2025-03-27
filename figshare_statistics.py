@@ -1,5 +1,6 @@
 import pandas as pd
 import datetime
+import random
 from figshare_statistics_for_categories import itemids_for_categories,figshare_categorystatistics, fetch_figshare_statistics, fetch_figshare_statistics
 
 #Gather item ids for each category and write it to a csv file
@@ -53,8 +54,14 @@ categories = [category for category in categories if pd.notna(category)]
 item_ids_full,item_ids=itemids_for_categories(categories)
 #print("**********json is*******************",)
 #Fetch metadata for each item id and write it to a json file
-item_metadata,error_list,categories_metadata=figshare_categorystatistics(item_ids_full)
+#Commenting this out because this takes forever to run:
+#item_metadata,error_list,categories_metadata=figshare_categorystatistics(item_ids_full)
 
+# Pick 100 random items from item_ids_full
+random_item_ids = random.sample(item_ids_full, min(100, len(item_ids_full)))
+
+print(f"Randomly selected 100 item IDs: {random_item_ids}")
+item_metadata,error_list,categories_metadata=figshare_categorystatistics(random_item_ids)
 keys_to_keep = ['figshare_url','citation','categories','id','doi','handle','url', 'published_date','defined_type_name']#, 'views','downloads']
 descriptor='figshare-statistics-category'
 jsonfilename=descriptor + '-full_records-'+str(datetime.datetime.now().strftime("%Y-%m-%d"))+'.json'
