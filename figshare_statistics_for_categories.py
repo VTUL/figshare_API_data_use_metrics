@@ -10,45 +10,39 @@ import os
 def itemids_for_categories(categories):
     BASE_URL = 'https://api.figshare.com/v2'
     results = []  # create a blank list
-
+    # search string taken from https://help.figshare.com/article/search-examples for multiple fields
     for i in categories:
-        query = '{"search_for":":category: ' + i + ' AND defined_type_name:dataset AND published_date:[2024-01-01 TO *]"}'
+        query = '{"search_for":":category: ' + i + '"}'
+        print('category is', i)
         print('query is', query)
         y = json.loads(query)  # Figshare API requires JSON parameters
         # Get the total number of pages
         for j in range(1, 50):
             r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
-            #print('Page', j, 'for term', i, 'collected successfully','JSON LOADS IS ',r)
             results.extend(r)  # Add the retrieved records to the list of records
     # Filter results to remove any strings or non-dictionary elements
     results = [item for item in results if isinstance(item, dict)]
     # Save all results to a JSON file
     with open('all_results_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.json', 'w') as f:
         json.dump(results, f)
-
+    
     # See the number of items
-    print('items retrieved total',len(results))
-    print('**********************Result is********************************', results)
-    print('**********************type(results) is********************************', type(results))
-    #Create a list of all the item ids
-    item_ids_full = [item['id'] for item in results]
-
-   # print('item_ids_full is ', item_ids_full)
-    # Create a list of all the item IDs where defined_type_name is "dataset"
-   # item_ids_full = [item['id'] for item in results]
-    #print('item_ids_full for item type dataset is', item_ids_full)
+    print('items retrieved total', len(results))
+    # Filter and pick the 'id' and 'defined_type_name' where 'defined_type_name' is 'dataset'
+    filtered_items = [(item['id'], item.get('defined_type_name', '')) for item in results if item.get('defined_type_name') == 'dataset']
+    print('Filtered items for defined_type_name "dataset":', filtered_items)
     # Remove duplicates by converting to a dictionary and back to a list
-    item_ids = list(dict.fromkeys(item_ids_full))
-    print(len(item_ids_full) - len(item_ids), 'duplicate records removed,', len(item_ids), 'unique records remain')
-    print('List of item IDs created, called item_ids', item_ids_full)
+    item_ids = list(dict.fromkeys([item[0] for item in filtered_items]))
+    print(len(filtered_items) - len(item_ids), 'duplicate records removed,', len(item_ids), 'unique records remain')
+    print('List of item IDs created, called item_ids', item_ids)
+    #filtered_items = [(item['id'], item.get('defined_type_name', '')) for item in results if item.get('defined_type_name') == 'dataset']
+    # Save the item IDs and defined_type_name to a CSV file
+    with open('item_ids_with_type_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv', 'w', newline='') as outfile:
+        out = csv.writer(outfile)
+        out.writerow(['id', 'defined_type_name'])  # Add headers
+        out.writerows(filtered_items)
 
-    # Save the item IDs to a CSV file
-    outfile = open('item_ids' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv', 'w')
-    out = csv.writer(outfile)
-    out.writerows(map(lambda x: [x], item_ids_full))
-    outfile.close()
-
-    return item_ids_full, item_ids
+    return [item[0] for item in filtered_items], item_ids
 
 def figshare_categorystatistics(itemList):
     item_metadata = []
@@ -107,8 +101,11 @@ def fetch_figshare_statistics(file_path):
     print(df)
 
     df['idstr'] = df['id'].astype(str)
-    df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
-    print('https://stats.figshare.com/' + df['institute'] + '/total/views/article/' + df['idstr'])
+    #df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
+    #print('https://stats.figshare.com/' + df['institute'] + '/total/views/article/' + df['idstr'])
+    #df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
+    df['inst_abbr'] = df['figshare_url'].str.split('.', n=2).str[1]
+    print('https://stats.figshare.com/' + df['inst_abbr'] + '/total/views/article/' + df['idstr'])
     df['inst_views'] = np.nan
     df['inst_downloads'] = np.nan
     df['stats_views_url'] = 'np.nan'
@@ -124,10 +121,10 @@ def fetch_figshare_statistics(file_path):
             df['stats_views_url'][i] = 'https://stats.figshare.com/total/views/article/' + df['idstr'][i]
             df['stats_downloads_url'][i] = 'https://stats.figshare.com/total/downloads/article/' + df['idstr'][i]
         else:
-            views = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]).content)
-            downs = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]).content)
-            df['stats_views_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]
-            df['stats_downloads_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]
+            views = json.loads(requests.get('https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/views/article/' + df['idstr'][i]).content)
+            downs = json.loads(requests.get('https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/downloads/article/' + df['idstr'][i]).content)
+            df['stats_views_url'][i] = 'https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/views/article/' + df['idstr'][i]
+            df['stats_downloads_url'][i] = 'https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/downloads/article/' + df['idstr'][i]
         instviews.append(views)
         instdownloads.append(downs)
         print(views, views.get('totals'))
