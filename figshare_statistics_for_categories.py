@@ -18,7 +18,8 @@ def itemids_for_categories(categories):
         y = json.loads(query)  # Figshare API requires JSON parameters
         # Get the total number of pages
         for j in range(1, 50):
-            r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
+           # r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
+            r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), json=y).content)
             results.extend(r)  # Add the retrieved records to the list of records
     # Filter results to remove any strings or non-dictionary elements
     results = [item for item in results if isinstance(item, dict)]
@@ -28,19 +29,37 @@ def itemids_for_categories(categories):
     
     # See the number of items
     print('items retrieved total', len(results))
-    # Filter and pick the 'id' and 'defined_type_name' where 'defined_type_name' is 'dataset'
-    filtered_items = [(item['id'], item.get('defined_type_name', '')) for item in results if item.get('defined_type_name') == 'dataset']
-    print('Filtered items for defined_type_name "dataset":', filtered_items)
+    # Filter and pick the 'id', 'defined_type_name', and 'published_date' where 'defined_type_name' is 'dataset' and 'published_date' is in range
+    filtered_items = [
+        (item['id'], item.get('defined_type_name', ''), item.get('published_date', ''))
+        for item in results
+        if item.get('defined_type_name') == 'dataset' and '2022-01-01' <= item.get('published_date', '') <= '2022-12-31'
+    ]
+    print('Filtered items for defined_type_name "dataset" and published_date in range:', filtered_items)
     # Remove duplicates by converting to a dictionary and back to a list
     item_ids = list(dict.fromkeys([item[0] for item in filtered_items]))
     print(len(filtered_items) - len(item_ids), 'duplicate records removed,', len(item_ids), 'unique records remain')
     print('List of item IDs created, called item_ids', item_ids)
-    #filtered_items = [(item['id'], item.get('defined_type_name', '')) for item in results if item.get('defined_type_name') == 'dataset']
-    # Save the item IDs and defined_type_name to a CSV file
-    with open('item_ids_with_type_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv', 'w', newline='') as outfile:
-        out = csv.writer(outfile)
-        out.writerow(['id', 'defined_type_name'])  # Add headers
-        out.writerows(filtered_items)
+
+    # Ensure the file is closed before overwriting
+    output_file = 'item_ids_with_type_and_date_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv'
+    try:
+        # Attempt to close the file if it is open
+        if os.path.exists(output_file):
+            try:
+                os.remove(output_file)
+                print(f"Closed and removed existing file: {output_file}")
+            except PermissionError:
+                print(f"PermissionError: Unable to remove {output_file}. Ensure the file is not open elsewhere.")
+                return [], []
+        # Write to the file
+        with open(output_file, 'w', newline='') as outfile:
+            out = csv.writer(outfile)
+            out.writerow(['id', 'defined_type_name', 'published_date'])  # Add headers
+            out.writerows(filtered_items)
+    except PermissionError:
+        print(f"PermissionError: Unable to write to {output_file}. Ensure the file is not open elsewhere.")
+        return [], []
 
     return [item[0] for item in filtered_items], item_ids
 
@@ -104,8 +123,19 @@ def fetch_figshare_statistics(file_path):
     #df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
     #print('https://stats.figshare.com/' + df['institute'] + '/total/views/article/' + df['idstr'])
     #df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
-    df['inst_abbr'] = df['figshare_url'].str.split('.', n=2).str[1]
-    print('https://stats.figshare.com/' + df['inst_abbr'] + '/total/views/article/' + df['idstr'])
+   # df['inst_abbr'] = df['figshare_url'].str.split('.', n=2).str[1]
+# Extract the institute name from the 'figshare_url' column
+    df['institute'] = df['figshare_url'].str.extract(r'https://(?:www\.)?([a-zA-Z0-9\-]+)\.figshare|https://(?:www\.)?([a-zA-Z0-9\-]+)\.ac\.uk').bfill(axis=1).iloc[:, 0]
+# Fill NaN values in 'institute' with 'figshare' for URLs like 'https://figshare.com'
+    df['institute'] = df['institute'].fillna('figshare')
+
+# Print the DataFrame to verify the extracted institute names
+    print(df[['figshare_url', 'institute']])
+    #print('https://stats.figshare.com/' + df['inst_abbr'] + '/total/views/article/' + df['idstr'])
+    # Save the DataFrame to a CSV file
+    output_file = 'extracted_figshare_statistics_' + str(datetime.datetime.now().strftime("%Y-%m-%d")) + '.csv'
+    df.to_csv(output_file, index=False, encoding='utf-8')
+    print(f"Data saved to {output_file}")
     df['inst_views'] = np.nan
     df['inst_downloads'] = np.nan
     df['stats_views_url'] = 'np.nan'
@@ -121,10 +151,10 @@ def fetch_figshare_statistics(file_path):
             df['stats_views_url'][i] = 'https://stats.figshare.com/total/views/article/' + df['idstr'][i]
             df['stats_downloads_url'][i] = 'https://stats.figshare.com/total/downloads/article/' + df['idstr'][i]
         else:
-            views = json.loads(requests.get('https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/views/article/' + df['idstr'][i]).content)
-            downs = json.loads(requests.get('https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/downloads/article/' + df['idstr'][i]).content)
-            df['stats_views_url'][i] = 'https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/views/article/' + df['idstr'][i]
-            df['stats_downloads_url'][i] = 'https://stats.figshare.com/' + df['inst_abbr'][i] + '/total/downloads/article/' + df['idstr'][i]
+            views = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]).content)
+            downs = json.loads(requests.get('https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]).content)
+            df['stats_views_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/views/article/' + df['idstr'][i]
+            df['stats_downloads_url'][i] = 'https://stats.figshare.com/' + df['institute'][i] + '/total/downloads/article/' + df['idstr'][i]
         instviews.append(views)
         instdownloads.append(downs)
         print(views, views.get('totals'))
