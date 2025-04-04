@@ -125,9 +125,16 @@ def fetch_figshare_statistics(file_path):
     #df['institute'] = df['figshare_url'].str.split('.', n=2).str[1]
    # df['inst_abbr'] = df['figshare_url'].str.split('.', n=2).str[1]
 # Extract the institute name from the 'figshare_url' column
-    df['institute'] = df['figshare_url'].str.extract(r'https://(?:www\.)?([a-zA-Z0-9\-]+)\.figshare|https://(?:www\.)?([a-zA-Z0-9\-]+)\.ac\.uk').bfill(axis=1).iloc[:, 0]
+    df['institute'] = df['figshare_url'].apply(
+        lambda url: (
+            'figshare' if url.startswith('https://figshare.com/articles/') else
+            url.split('https://data.')[1].split('.')[0] if url.startswith('https://data.') else
+            url.split('https://')[1].split('.figshare.com')[0] if '.figshare.com' in url else
+            np.nan
+        )
+    )
 # Fill NaN values in 'institute' with 'figshare' for URLs like 'https://figshare.com'
-    df['institute'] = df['institute'].fillna('figshare')
+    df['institute'] = df['institute'].fillna('Unknown')
 
 # Print the DataFrame to verify the extracted institute names
     print(df[['figshare_url', 'institute']])
