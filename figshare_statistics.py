@@ -44,7 +44,7 @@ category_search = "main_category"
 if category_search == "main_category":
     category_to_find = "3704"
     # Filter the DataFrame to find the rows that match the main category
-    filtered_df = df[df["MainCategoryNumber"] == category_to_find]
+    filtered_df = df[df["MainCategoryNumber"].astype(str) == category_to_find]
 
 # Match with the subcategory number
 if category_search == "sub_category":
@@ -56,12 +56,32 @@ if category_search == "sub_category":
 # Print the filtered DataFrame
 print(filtered_df)
 
+# Save the filtered DataFrame to a CSV file for cross-checking
+filtered_df.to_csv(
+    "Filtered_Figshare_categories_" + str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".csv",
+    index=False,
+    encoding="utf-8"
+)
+
 # If you need to use the filtered DataFrame for further processing
 categories = filtered_df["SubCategoryName"].tolist()
 
 # Remove NaN values from the 'categories' list
 categories = [category for category in categories if pd.notna(category)]
 
+
+# Save the categories list to a CSV file for cross-checking
+with open(
+    "Selected_Categories_" + str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".csv",
+    "w",
+    encoding="utf-8"
+) as f:
+    f.write("SubCategoryName\n")  # Add a header
+    f.writelines([category + "\n" for category in categories])
+print('********************',categories,'*********************')
+#quit()
+#categories=['Computational modelling and simulation in earth sciences', 'Earth and space science informatics', 'Geoscience data visualisation', 'Geoinformatics not elsewhere classified']
+#categories=['Computational modelling and simulation in earth sciences', 'Earth and space science informatics', 'Geoscience data visualisation', 'Geoinformatics not elsewhere classified']
 #####################
 item_ids_full, item_ids = itemids_for_categories(categories)
 
