@@ -21,3 +21,11 @@ These codes help get figshare statistics for specified categories. They were gat
    1. LimitedMetadataInFigshare_report_datasets[current_date].csv: limited metadata for the items related to the category picked (by the code)
    2. allMetadataInFigshare_report_datasets[current_date].csv: all the metadata for the items related to the category picked (by the code)
 
+# Links
+
+- https://help.figshare.com/article/how-to-use-advanced-search-in-figshare
+- https://colab.research.google.com/drive/1bCVsSjg5Y5WsHHsxTq_W1j1U3B4TyO2x#scrollTo=415f0c3e-d599-415d-944e-6fe1aaad18dc
+- https://help.figshare.com/article/search-examples
+- https://help.figshare.com/article/how-to-use-the-figshare-api#metadata-search
+- https://help.figshare.com/article/how-to-use-the-figshare-api#search-ids
+

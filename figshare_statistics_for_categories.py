@@ -13,6 +13,8 @@ def itemids_for_categories(categories):
     # search string taken from https://help.figshare.com/article/search-examples for multiple fields
     for i in categories:
         query = '{"search_for":":category: ' + i + '"}'
+       # query = {"search_for": ":category_name: \"{i}\""}
+        #query = '{"search_for":":category: f'"{i}"'}'
         print('category is', i)
         print('query is', query)
         y = json.loads(query)  # Figshare API requires JSON parameters
