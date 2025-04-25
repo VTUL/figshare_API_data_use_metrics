@@ -10,3 +10,13 @@ git rm --cached *.csv
 *.pyc
 __pycache__
 --*
+
+# Ignore everything
+*
+
+# Allow only .py files
+!*.py
+
+# Ignore __pycache__ and compiled Python files
+__pycache__/
+*.pyc
