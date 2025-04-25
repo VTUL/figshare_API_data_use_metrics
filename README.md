@@ -29,7 +29,7 @@ These codes help get figshare statistics for specified categories. They were gat
 
 ### Running `FigStats-iType-dRange.py`
 1. Open `FigStats-iType-dRange.py`.
-2. Set the desired year and date ranges in the script. For testing, you can use a 2-day range by uncommenting the test range:
+2. Change the save_directory to the desired directory and run the code. The code currently gathers statistics for 2022 in 5 day increments. If testing for a customized year then change the year in "date_ranges.extend(generate_date_ranges(2022, month))". This will gather statistics in 5 days increments for the year given. If customizing the date range to specific days then uncomment the test range as below and run the code:
    ```python
    date_ranges = [
        ("2022-01-01", "2022-01-02")  # Replace with any desired 2-day range
