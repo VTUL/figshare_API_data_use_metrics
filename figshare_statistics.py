@@ -42,7 +42,8 @@ category_search = "main_category"
 #####################
 # Match with the main category number
 if category_search == "main_category":
-    category_to_find = "3704"
+   # category_to_find = "3704"
+    category_to_find = "3705"
     # Filter the DataFrame to find the rows that match the main category
     filtered_df = df[df["MainCategoryNumber"].astype(str) == category_to_find]
 
@@ -142,3 +143,6 @@ fetch_figshare_statistics(
     + str(datetime.datetime.now().strftime("%Y-%m-%d"))
     + ".csv"
 )
+
+file="LimitedMetadataInFigshare_report_datasets2025-04-11.csv"
+fetch_figshare_statistics(file)

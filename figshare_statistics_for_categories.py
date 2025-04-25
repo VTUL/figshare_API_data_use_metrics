@@ -12,14 +12,18 @@ def itemids_for_categories(categories):
     results = []  # create a blank list
     # search string taken from https://help.figshare.com/article/search-examples for multiple fields
     for i in categories:
-        query = '{"search_for":":category: ' + i + '"}'
+        print('category is', i)
+        #query = '{"search_for":":category: ' + i + '"}'
        # query = {"search_for": ":category_name: \"{i}\""}
         #query = '{"search_for":":category: f'"{i}"'}'
+        query = '{"search_for":":category_name: \\"' + i + '\\""}'  # Match category name exactly
         print('category is', i)
         print('query is', query)
         y = json.loads(query)  # Figshare API requires JSON parameters
         # Get the total number of pages
-        for j in range(1, 50):
+        print('y is ',y)
+        #quit()
+        for j in range(1, 100):
            # r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), params=y).content)
             r = json.loads(requests.post(BASE_URL + '/articles/search?page_size=1000&page={}'.format(j), json=y).content)
             results.extend(r)  # Add the retrieved records to the list of records
