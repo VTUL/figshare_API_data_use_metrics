@@ -1,3 +1,4 @@
+# Import necessary libraries
 import pandas as pd
 import datetime
 from datetime import datetime, timedelta
@@ -8,22 +9,19 @@ import os
 import logging
 import time
 import requests
-import json as json
 import numpy as np
-import time
+
 # Record the start time of the script
 start_time = time.time()
 print(f"Script started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 logging.info(f"Script started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-
-# Define the save directory
+# Define the save directory for output files
 save_directory = r"c:\Users\padma\anaconda3\envs\figshare_statistics\figshare_statistics_categories"
 json_filename = os.path.join(save_directory, 'all_results_' + str(datetime.now().strftime("%Y-%m-%d")) + '.json')
 csv_filename = os.path.join(save_directory, "all_results_" + str(datetime.now().strftime("%Y-%m-%d")) + ".csv")
 
-
-# Configure logging
+# Configure logging to track progress and errors
 log_filename = os.path.join(save_directory, "progress_log_" + str(datetime.now().strftime("%Y-%m-%d")) + ".txt")
 logging.basicConfig(
     filename=log_filename,
@@ -32,18 +30,20 @@ logging.basicConfig(
 )
 logging.info("Script started.")
 
+# Define the base URL for the Figshare API
 BASE_URL = 'https://api.figshare.com/v2'
-results = []  # create a blank list
 
-
+# Initialize an empty list to store results
+results = []
 
 # Function to generate 5-day intervals for a given month
 def generate_date_ranges(year, month):
-    start_date = datetime(year, month, 1)
+    start_date = datetime(year, month, 1)  # First day of the month
     end_date = (start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)  # Last day of the month
     date_ranges = []
     current_date = start_date
 
+    # Generate 5-day intervals
     while current_date <= end_date:
         next_date = current_date + timedelta(days=4)
         if next_date > end_date:
@@ -59,14 +59,14 @@ date_ranges = []
 for month in range(1, 13):  # Loop through all months (1 to 12)
     date_ranges.extend(generate_date_ranges(2022, month))
 
-#******************Test date ranges********************
+# ****************** Test run for 2 days ********************
 # Define a short date range for testing (2 days)
-date_ranges = [
-    ("2022-01-01", "2022-01-02")  # Replace with any desired 2-day range
-]
+#date_ranges = [
+#    ("2022-01-01", "2022-01-02")  # Replace with any desired 2-day range
+#]
 
 # Print the test date ranges for verification
-print("Testing with the following date ranges:")
+#print("Testing with the following date ranges:", date_ranges)
 #**************************
 # Print the generated date ranges for verification
 for start_date, end_date in date_ranges:
@@ -75,6 +75,7 @@ for start_date, end_date in date_ranges:
 print(f"Date ranges generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 logging.info(f"Date ranges generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+# Process each date range
 for start_date, end_date in date_ranges:
     range_start_time = time.time()  # Record the start time for this date range
     logging.info(f"Processing date range: {start_date} to {end_date}")
@@ -89,7 +90,6 @@ for start_date, end_date in date_ranges:
             BASE_URL + '/articles/search?page_size=1000&page={}'.format(j),
             json=query
         )
-        #print(len)
         if response.status_code != 200:
             logging.error(f"Error fetching page {j}: {response.status_code} - {response.text}")
             print(f"Error fetching page {j}: {response.status_code} - {response.text}")
@@ -102,21 +102,18 @@ for start_date, end_date in date_ranges:
         if len(r) < 1000:  # Stop if fewer than 1,000 results are returned
             logging.info(f"Fewer than 1,000 results on page {j}. ")
             print(f"Fewer than 1,000 results on page {j}. ")
-          #  break
         results.extend(r)
         logging.info(f"Page {j} fetched successfully. Total results so far: {len(results)}")
         print(f"Page {j} fetched successfully. Total results so far: {len(results)}")
         time.sleep(10)  # Add a delay to avoid hitting rate limits
-        range_end_time = time.time()
-        print(f"Finished processing date range {start_date} to {end_date} in {range_end_time - range_start_time:.2f} seconds")
-        logging.info(f"Finished processing date range {start_date} to {end_date} in {range_end_time - range_start_time:.2f} seconds")
+    range_end_time = time.time()
+    print(f"Finished processing date range {start_date} to {end_date} in {range_end_time - range_start_time:.2f} seconds")
+    logging.info(f"Finished processing date range {start_date} to {end_date} in {range_end_time - range_start_time:.2f} seconds")
 
 # Filter results to remove any strings or non-dictionary elements
 results = [item for item in results if isinstance(item, dict)]
 logging.info(f"Filtered results. Total valid items: {len(results)}")
 print(f"Filtered results. Total valid items: {len(results)}")
-
-
 
 # Save all results to a JSON file
 with open(json_filename, 'w') as f:
@@ -137,14 +134,8 @@ except Exception as e:
     logging.error(f"Error converting JSON to CSV: {e}")
     print(f"Error converting JSON to CSV: {e}")
 
-
-
-
 logging.info(f"Starting to fetch statistics and save to CSV: {csv_filename}")
 print(f"Starting to fetch statistics and save to CSV: {csv_filename}")
-
-
-
 
 #&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 # Read the CSV file
@@ -170,15 +161,16 @@ output_file = os.path.join(save_directory, 'extracted_figshare_statistics_' + st
 df.to_csv(output_file, index=False, encoding='utf-8')
 print(f"Data saved to {output_file}")
 
-# Initialize new columns for statistics
+# Initialize new columns for statistics with the correct data type
 df['inst_views'] = np.nan
 df['inst_downloads'] = np.nan
-df['stats_views_url'] = np.nan
-df['stats_downloads_url'] = np.nan
+df['stats_views_url'] = pd.Series(dtype='object')  # Explicitly set dtype to 'object'
+df['stats_downloads_url'] = pd.Series(dtype='object')  # Explicitly set dtype to 'object'
 
-# Lists to store views and downloads
+# Initialize lists to store views and downloads
 instviews = []
 instdownloads = []
+# Record the start time for fetching statistics
 stats_start_time = time.time()
 # Fetch statistics for each item
 for i in range(len(df['id'])):

@@ -5,11 +5,15 @@ These codes help get figshare statistics for specified categories. They were gat
 
 # About the scripts
 
-- The first function itemids_for_categories() generates item ids associated with the given categories. 
-- The second function figshare_categorystatistics(itemList) takes an item list and creates a json file for all the metadata associated with the item ids. 
-- The third function fetch_fighsare_statistics(file_path) gathers figshare statistics for the provided csv file
+- The first function `itemids_for_categories()` generates item ids associated with the given categories. 
+- The second function `figshare_categorystatistics(itemList)` takes an item list and creates a JSON file for all the metadata associated with the item ids. 
+- The third function `fetch_figshare_statistics(file_path)` gathers figshare statistics for the provided CSV file.
+- The new script `FigStats-iType-dRange.py`:
+  - Processes Figshare statistics for datasets within specific date ranges.
+  - Generates 5-day intervals for a given year and retrieves metadata and statistics for items posted within those intervals.
+  - Saves results as JSON and CSV files, including detailed views and downloads statistics.
 
-# How to run the code
+# How to run the categories codes
 
 - Go to [category numbers matching with category names figshare dataset](https://figshare.com/articles/dataset/Fields_of_Research_FoR_Classification/10305443/1?file=35317927) and download the Figshare categories as a csv file, name it Figshare_categories.csv
 - Open figshare_statistics.py and change the file path of the Figshare categories csv file in 'file_path'
@@ -20,6 +24,16 @@ These codes help get figshare statistics for specified categories. They were gat
 - Two other csv files are also generated:
    1. LimitedMetadataInFigshare_report_datasets[current_date].csv: limited metadata for the items related to the category picked (by the code)
    2. allMetadataInFigshare_report_datasets[current_date].csv: all the metadata for the items related to the category picked (by the code)
+
+# How to run the FigStats-iType-dRange code
+
+### Running `FigStats-iType-dRange.py`
+1. Open `FigStats-iType-dRange.py`.
+2. Set the desired year and date ranges in the script. For testing, you can use a 2-day range by uncommenting the test range:
+   ```python
+   date_ranges = [
+       ("2022-01-01", "2022-01-02")  # Replace with any desired 2-day range
+   ]
 
 # Links
 
