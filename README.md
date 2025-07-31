@@ -5,7 +5,7 @@ These codes help get figshare statistics for specified categories. They were gat
 
 # About the scripts
 
-- The first function `itemids_for_categories()` generates item ids associated with the given categories. 
+- The first function `itemids_for_categories()` in figshare_statistics_for_categories.py generates item ids associated with the given categories. 
 - The second function `figshare_categorystatistics(itemList)` takes an item list and creates a JSON file for all the metadata associated with the item ids. 
 - The third function `fetch_figshare_statistics(file_path)` gathers figshare statistics for the provided CSV file.
 - The new script `FigStats-iType-dRange.py`:
@@ -43,3 +43,16 @@ These codes help get figshare statistics for specified categories. They were gat
 - https://help.figshare.com/article/how-to-use-the-figshare-api#metadata-search
 - https://help.figshare.com/article/how-to-use-the-figshare-api#search-ids
 
+
+## Work in Progress
+
+**Step 1: OAI-PMH Harvest**  
+_See: `oaimphFig.py`_
+- Harvests institution IDs and institution URLs using the OAI-PMH protocol.
+- Institution abbreviation can be extracted from institution URLs.
+- Institution abbreviation is used to gather statistics. Some work, some don't. (We may need to contact institutes to gather the correct abbreviation.)
+
+**Step 2: Harvest Datasets and Gather Statistics**  
+_See: `stats_from_instID.py`_
+- Uses institution IDs and URLs to harvest datasets from the regular Figshare API.
+- Uses item IDs from the harvested data and institution URLs to gather statistics for a given date and item type (e.g., 'dataset').
