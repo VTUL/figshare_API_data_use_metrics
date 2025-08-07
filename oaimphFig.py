@@ -147,7 +147,9 @@ for i in newRecords:
     # Build query for searching articles for this institution
     query = '{"institution":' + str(id) + ', "page_size":1}'
     y = json.loads(query) # Convert the string to a dictionary (JSON)
+    print('query is', query)
     r = requests.post(BASE_URL + "/articles/search", params=y)
+    print('*********Search request URL:', BASE_URL + "/articles/search", 'with params:', y)
     print('Search request status:', r.status_code)
     log_to_file('Search request status:', r.status_code)
     if r.status_code == 200:
