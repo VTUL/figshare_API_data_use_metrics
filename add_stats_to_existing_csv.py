@@ -201,7 +201,10 @@ def add_statistics_to_csv(csv_file_path, output_file_path=None):
                 df_with_stats = pd.DataFrame(stats_list)
                 print(f'========== DEBUG: Created DataFrame with stats, shape: {df_with_stats.shape} =========')
                 original_columns = df.columns.tolist()
-                new_stats_columns = ['stats_url_used', 'stats_status_code', 'views', 'downloads']
+                new_stats_columns = [
+                    'views_url_used', 'views_status_code', 
+                    'downloads_url_used', 'downloads_status_code', 'views','downloads'
+                ]
                 final_columns = original_columns.copy()
                 for col in new_stats_columns:
                     if col not in final_columns:
@@ -227,7 +230,10 @@ def add_statistics_to_csv(csv_file_path, output_file_path=None):
         df_with_stats = pd.DataFrame(stats_list)
         print(f'DEBUG: Created DataFrame with stats, shape: {df_with_stats.shape}')
         original_columns = df.columns.tolist()
-        new_stats_columns = ['stats_url_used', 'stats_status_code', 'views', 'downloads']
+        new_stats_columns = [
+            'views_url_used', 'views_status_code', 
+            'downloads_url_used', 'downloads_status_code','views', 'downloads'
+        ]
         final_columns = original_columns.copy()
         for col in new_stats_columns:
             if col not in final_columns:
@@ -271,9 +277,11 @@ def main():
             print(f'📄 Input file: {input_csv}')
             print(f'📄 Output file: {output_file}')
             print(f'\n📋 The new file includes all original columns plus:')
-            print(f'   • stats_url_used: The URL used to fetch statistics')
-            print(f'   • stats_status_code: HTTP status code from stats API')
+            print(f'   • views_url_used: The URL used to fetch views statistics')
+            print(f'   • views_status_code: HTTP status code from views API')
             print(f'   • views: Total view count')
+            print(f'   • downloads_url_used: The URL used to fetch downloads statistics')
+            print(f'   • downloads_status_code: HTTP status code from downloads API')
             print(f'   • downloads: Download count (if available)')
             print(f'\n⏰ Completed at: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
         else:
