@@ -4,6 +4,53 @@ import pandas as pd
 import datetime
 
 # Helper function to also write to a log file
+import os
+# Function to harvest all public items from figshare.com
+def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", end_date="2022-12-31", max_pages=1000):
+    BASE_URL = 'https://api.figshare.com/v2'
+    results = []
+    # Split the date range into monthly batches
+    start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    batch_ranges = []
+    current = start_dt
+    while current < end_dt:
+        batch_start = current
+        # Get last day of month
+        next_month = (batch_start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+        batch_end = min(next_month - datetime.timedelta(days=1), end_dt)
+        batch_ranges.append((batch_start.strftime("%Y-%m-%d"), batch_end.strftime("%Y-%m-%d")))
+        current = batch_end + datetime.timedelta(days=1)
+    print(f"DEBUG: Batching into {len(batch_ranges)} monthly ranges: {batch_ranges}")
+    for batch_start, batch_end in batch_ranges:
+        print(f"DEBUG: Harvesting batch {batch_start} to {batch_end}")
+        query = {
+            "search_for": f":item_type: {item_type} AND :posted_before: {batch_end} AND :posted_after: {batch_start}"
+        }
+        for page in range(1, max_pages + 1):
+            url = f"{BASE_URL}/articles/search?page_size=1000&page={page}"
+            response = requests.post(url, json=query)
+            print(f"Batch {batch_start} to {batch_end}, Page {page} status: {response.status_code}")
+            if response.status_code != 200:
+                print(f"Error on batch {batch_start} to {batch_end}, page {page}: {response.status_code}")
+                print("Request URL:", url)
+                print("Request payload:", query)
+                print("Response content:", response.text)
+                break
+            items = response.json()
+            if not items:
+                print(f"No more items found in batch {batch_start} to {batch_end}.")
+                break
+            results.extend(items)
+            print(f"Batch {batch_start} to {batch_end}, Page {page}: {len(items)} items retrieved, total so far: {len(results)}")
+            if len(items) < 1000:
+                break
+    # Save results to JSON
+    filename = f"figshare_public_items_{datetime.datetime.now().strftime('%Y-%m-%d')}.json"
+    with open(filename, "w") as f:
+        json.dump(results, f)
+    print(f"Harvest complete. Total items: {len(results)}. Saved to {filename}")
+    return results
 def log_to_file(*args, **kwargs):
     with open('harvest_institution_log.txt', 'a', encoding='utf-8') as f:
         print(*args, **kwargs, file=f)
@@ -161,13 +208,11 @@ if __name__ == "__main__":
         print('DEBUG: Calling harvest_multiple_institutions')
         harvest_multiple_institutions(institution_ids)
         print('DEBUG: harvest_multiple_institutions completed')
-        
         print(f'DEBUG: Final counts - newRecords: {len(newRecords)}, errorList: {len(errorList)}')
         print(f'Harvesting complete. Total items collected: {len(newRecords)}')
         print(f'There were {len(errorList)} errors.')
         log_to_file(f'Harvesting complete. Total items collected: {len(newRecords)}')
         log_to_file(f'There were {len(errorList)} errors.')
-        
         # Merge in columns from sheet 0 to newRecords before saving
         key_col = 'institution_id' if 'institution_id' in df0.columns else 'instution_id'
         # Build a mapping from institution_id to all columns in df0 (except the key)
@@ -178,24 +223,46 @@ if __name__ == "__main__":
                 for k, v in df0_map[inst_id].items():
                     if k not in rec:
                         rec[k] = v
+        # Harvest figshare.com public items and append to results
+        print('DEBUG: Harvesting figshare.com public items')
+        figshare_items = harvest_figshare_public_items()
+        print(f'DEBUG: Appending {len(figshare_items)} figshare.com items to harvested items')
+        all_items = newRecords + figshare_items
 
-        # Save harvested items to JSON and CSV
+        # Fetch full metadata for each item
+        print('DEBUG: Fetching full metadata for all harvested items')
+        enriched_items = []
+        for idx, item in enumerate(all_items):
+            item_id = item.get('id')
+            if item_id:
+                try:
+                    url = f"https://api.figshare.com/v2/articles/{item_id}"
+                    resp = requests.get(url)
+                    if resp.status_code == 200:
+                        full_meta = resp.json()
+                        # Merge full metadata into item (preserve original keys)
+                        item.update(full_meta)
+                    else:
+                        print(f"Warning: Could not fetch full metadata for item {item_id}, status {resp.status_code}")
+                except Exception as e:
+                    print(f"Error fetching metadata for item {item_id}: {e}")
+            enriched_items.append(item)
+            if (idx+1) % 100 == 0:
+                print(f"Fetched metadata for {idx+1} items...")
+
+        # Save all enriched items to JSON and CSV
         today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         print(f'DEBUG: Saving files with date-time suffix: {today}')
-        
-        json_file = f'harvested_items_{today}.json'
+        json_file = f'harvested_items_{today}_fullmeta.json'
         print(f'DEBUG: Saving JSON file: {json_file}')
         with open(json_file, 'w') as f:
-            json.dump(newRecords, f, indent=2)
-        
-        csv_file = f'harvested_items_{today}.csv'
+            json.dump(enriched_items, f, indent=2)
+        csv_file = f'harvested_items_{today}_fullmeta.csv'
         print(f'DEBUG: Saving CSV file: {csv_file}')
-        df_items = pd.DataFrame(newRecords)
+        import pandas as pd
+        df_items = pd.DataFrame(enriched_items)
         df_items.to_csv(csv_file, index=False)
         print(f'DEBUG: CSV file saved, shape: {df_items.shape}')
-        
-        # ...removed statistics gathering and saving code...
-        
         print('DEBUG: All operations completed successfully')
         print('All data saved to files.')
         log_to_file('All data saved to files.')
