@@ -273,13 +273,13 @@ if __name__ == "__main__":
         log_to_file(f'Error reading institution file: {e}')
         
         # Example with single institution ID for testing
-        test_institution_id = "123"  # Replace with actual institution ID
-        print(f'DEBUG: Running test with institution ID: {test_institution_id}')
-        harvest_institution_items(test_institution_id)
-        print(f'Test harvest complete. Items collected: {len(newRecords)}')
-        print(f'DEBUG: Running test with institution ID: {test_institution_id}')
-        harvest_institution_items(test_institution_id)
-        print(f'Test harvest complete. Items collected: {len(newRecords)}')
-        print(f'DEBUG: Running test with institution ID: {test_institution_id}')
-        harvest_institution_items(test_institution_id)
-        print(f'Test harvest complete. Items collected: {len(newRecords)}')
+        #test_institution_id = "123"  # Replace with actual institution ID
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
