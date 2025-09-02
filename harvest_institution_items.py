@@ -227,12 +227,23 @@ if __name__ == "__main__":
         print('DEBUG: Harvesting figshare.com public items')
         figshare_items = harvest_figshare_public_items()
         print(f'DEBUG: Appending {len(figshare_items)} figshare.com items to harvested items')
-        all_items = newRecords + figshare_items
 
-        # Fetch full metadata for each item
-        print('DEBUG: Fetching full metadata for all harvested items')
-        enriched_items = []
-        for idx, item in enumerate(all_items):
+        # Randomly select as many figshare.com items as institution items
+        n_institution = len(newRecords)
+        print(f"DEBUG: Number of institution items: {n_institution}")
+        figshare_sample = []
+        if len(figshare_items) >= n_institution:
+            import random
+            figshare_sample = random.sample(figshare_items, n_institution)
+        else:
+            figshare_sample = figshare_items.copy()
+        print(f"DEBUG: Randomly selected {len(figshare_sample)} figshare.com items for full metadata fetch")
+
+        # Fetch full metadata for institution items
+        print('DEBUG: Fetching full metadata for institution items')
+        enriched_institution_items = []
+        for idx, item in enumerate(newRecords):
+        #for idx, item in enumerate(newRecords[:5]): #for testing 1
             item_id = item.get('id')
             if item_id:
                 try:
@@ -240,15 +251,38 @@ if __name__ == "__main__":
                     resp = requests.get(url)
                     if resp.status_code == 200:
                         full_meta = resp.json()
-                        # Merge full metadata into item (preserve original keys)
                         item.update(full_meta)
                     else:
                         print(f"Warning: Could not fetch full metadata for item {item_id}, status {resp.status_code}")
                 except Exception as e:
                     print(f"Error fetching metadata for item {item_id}: {e}")
-            enriched_items.append(item)
+            enriched_institution_items.append(item)
             if (idx+1) % 100 == 0:
-                print(f"Fetched metadata for {idx+1} items...")
+                print(f"Fetched metadata for {idx+1} institution items...")
+
+        # Fetch full metadata for the sampled figshare.com items
+        print('DEBUG: Fetching full metadata for sampled figshare.com items')
+        enriched_figshare_sample = []
+        for idx, item in enumerate(figshare_sample):
+        #for idx, item in enumerate(figshare_sample[:5]):
+            item_id = item.get('id')
+            if item_id:
+                try:
+                    url = f"https://api.figshare.com/v2/articles/{item_id}"
+                    resp = requests.get(url)
+                    if resp.status_code == 200:
+                        full_meta = resp.json()
+                        item.update(full_meta)
+                    else:
+                        print(f"Warning: Could not fetch full metadata for figshare item {item_id}, status {resp.status_code}")
+                except Exception as e:
+                    print(f"Error fetching metadata for figshare item {item_id}: {e}")
+            enriched_figshare_sample.append(item)
+            if (idx+1) % 100 == 0:
+                print(f"Fetched metadata for {idx+1} figshare.com items...")
+
+        # Combine enriched institution items and enriched sampled figshare.com items
+        final_items = enriched_institution_items + enriched_figshare_sample
 
         # Save all enriched items to JSON and CSV
         today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -256,11 +290,10 @@ if __name__ == "__main__":
         json_file = f'harvested_items_{today}_fullmeta.json'
         print(f'DEBUG: Saving JSON file: {json_file}')
         with open(json_file, 'w') as f:
-            json.dump(enriched_items, f, indent=2)
+            json.dump(final_items, f, indent=2)
         csv_file = f'harvested_items_{today}_fullmeta.csv'
         print(f'DEBUG: Saving CSV file: {csv_file}')
-        import pandas as pd
-        df_items = pd.DataFrame(enriched_items)
+        df_items = pd.DataFrame(final_items)
         df_items.to_csv(csv_file, index=False)
         print(f'DEBUG: CSV file saved, shape: {df_items.shape}')
         print('DEBUG: All operations completed successfully')
