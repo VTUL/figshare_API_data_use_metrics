@@ -6,7 +6,8 @@ import datetime
 # Helper function to also write to a log file
 import os
 # Function to harvest all public items from figshare.com
-def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", end_date="2022-12-31", max_pages=1000):
+#def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", end_date="2022-12-31", max_pages=1000):
+def harvest_figshare_public_items(start_date, end_date, item_type, max_pages):
     BASE_URL = 'https://api.figshare.com/v2'
     results = []
     # Split the date range into monthly batches
@@ -41,15 +42,17 @@ def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", 
             if not items:
                 print(f"No more items found in batch {batch_start} to {batch_end}.")
                 break
-            results.extend(items)
-            print(f"Batch {batch_start} to {batch_end}, Page {page}: {len(items)} items retrieved, total so far: {len(results)}")
+            # Only keep items where 'url_public_html' starts with 'https://figshare.com'
+            filtered_items = [item for item in items if str(item.get('url_public_html', '')).startswith('https://figshare.com')]
+            results.extend(filtered_items)
+            print(f"Batch {batch_start} to {batch_end}, Page {page}: {len(filtered_items)} figshare.com items retrieved, total so far: {len(results)}")
             if len(items) < 1000:
                 break
     # Save results to JSON
     filename = f"figshare_public_items_{datetime.datetime.now().strftime('%Y-%m-%d')}.json"
     with open(filename, "w") as f:
         json.dump(results, f)
-    print(f"Harvest complete. Total items: {len(results)}. Saved to {filename}")
+    print(f"Harvest complete. Total figshare.com items: {len(results)}. Saved to {filename}")
     return results
 def log_to_file(*args, **kwargs):
     with open('harvest_institution_log.txt', 'a', encoding='utf-8') as f:
@@ -62,7 +65,8 @@ BASE_URL = 'https://api.figshare.com/v2'
 errorList = []
 newRecords = []
 
-def harvest_institution_items(institution_id, item_type="dataset", start_date="2022-01-01", end_date="2022-12-31"):
+#def harvest_institution_items(institution_id, item_type="dataset", start_date="2022-01-01", end_date="2022-12-31"):
+def harvest_institution_items(institution_id, start_date, end_date, item_type):
     """
     Harvest items for a specific institution
     """
@@ -163,7 +167,8 @@ def harvest_institution_items(institution_id, item_type="dataset", start_date="2
     print(f'Institution {institution_id}: Total items harvested: {len([r for r in newRecords if r.get("harvested_institution_id") == institution_id])}')
     log_to_file(f'Institution {institution_id}: Total items harvested: {len([r for r in newRecords if r.get("harvested_institution_id") == institution_id])}')
 
-def harvest_multiple_institutions(institution_ids, item_type="dataset", start_date="2022-01-01", end_date="2022-12-31"):
+#def harvest_multiple_institutions(institution_ids, item_type="dataset", start_date="2022-01-01", end_date="2022-12-31"):
+def harvest_multiple_institutions(institution_ids, start_date, end_date, item_type):
     """
     Harvest items for multiple institutions
     """
@@ -171,7 +176,7 @@ def harvest_multiple_institutions(institution_ids, item_type="dataset", start_da
     print(f'DEBUG: Institution IDs: {institution_ids}')
     for i, inst_id in enumerate(institution_ids):
         print(f'DEBUG: Processing institution {i+1}/{len(institution_ids)}: {inst_id}')
-        harvest_institution_items(inst_id, item_type, start_date, end_date)
+        harvest_institution_items(inst_id,  start_date, end_date,item_type)
         print(f'DEBUG: Completed institution {i+1}/{len(institution_ids)}: {inst_id}')
 
 
@@ -206,7 +211,10 @@ if __name__ == "__main__":
         
         # Harvest items for institutions
         print('DEBUG: Calling harvest_multiple_institutions')
-        harvest_multiple_institutions(institution_ids)
+        start_date = "2022-01-01"
+        end_date = "2022-12-31"
+        item_type = "dataset"
+        harvest_multiple_institutions(institution_ids, start_date, end_date, item_type)
         print('DEBUG: harvest_multiple_institutions completed')
         print(f'DEBUG: Final counts - newRecords: {len(newRecords)}, errorList: {len(errorList)}')
         print(f'Harvesting complete. Total items collected: {len(newRecords)}')
@@ -225,7 +233,12 @@ if __name__ == "__main__":
                         rec[k] = v
         # Harvest figshare.com public items and append to results
         print('DEBUG: Harvesting figshare.com public items')
-        figshare_items = harvest_figshare_public_items()
+        #figshare_items = harvest_figshare_public_items()
+        #figshare_items = harvest_figshare_public_items(start_date=start_date, end_date=end_date)
+        max_pages = 1000  # Adjust as needed
+        print(f'DEBUG: Calling harvest_figshare_public_items with start_date={start_date}, end_date={end_date}, item_type={item_type}, max_pages={max_pages}')
+        figshare_items = harvest_figshare_public_items(start_date, end_date,item_type,max_pages)
+        
         print(f'DEBUG: Appending {len(figshare_items)} figshare.com items to harvested items')
 
         # Randomly select as many figshare.com items as institution items
@@ -283,6 +296,11 @@ if __name__ == "__main__":
 
         # Combine enriched institution items and enriched sampled figshare.com items
         final_items = enriched_institution_items + enriched_figshare_sample
+
+        # REMOVE 'files' key from all items to avoid CSV line break issues
+        for item in final_items:
+            if 'files' in item:
+                del item['files']
 
         # Save all enriched items to JSON and CSV
         today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
