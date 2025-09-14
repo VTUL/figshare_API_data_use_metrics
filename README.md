@@ -58,7 +58,51 @@ There are now three main scripts for harvesting and analyzing institutional data
    - Gathers statistics (views, downloads, etc.) for each item using the appropriate stats API.
    - Adds these statistics as new columns to the CSV.
 
-The csv output harvested from step 1 was filtered manually to generate a 3rd sheet (sheet 2) which contains institution ids, and the ones with curation reviews. This sheet in addition to sheet 0 was used in the following 2 codes.
+## Institution-Specific and Fallback Stats URL Logic
+
+The script now supports institution-specific statistics endpoints for:
+- University of Melbourne
+- University of Sheffield
+- University of Leicester
+- Virginia Tech
+- J-STAGE
+- Ryerson
+
+If a direct match is not found, the script will:
+1. Try to construct the stats URL using the institution name (with common prefixes like "University of" removed).
+2. Try to construct the stats URL using the first word after the slash in the DOI (e.g., for DOI `10.25400/lincolnuninz.21358338.v1`, the stats URL will use `lincolnuninz`).
+
+All attempted URLs and their HTTP responses are printed and logged for debugging.
+
+### Required Columns
+
+Your CSV should include at least:
+- `id` (item ID)
+- `harvested_institution_id`
+- `url_public_html`
+- `name` (institution name)
+- `doi` (if available)
+
+### Output
+
+- A new CSV file will be created with additional columns:
+  - `views_url_used`
+  - `views_status_code`
+  - `views`
+  - `downloads_url_used`
+  - `downloads_status_code`
+  - `downloads`
+- A log file will be created with detailed debug information.
+
+### Example
+
+For an item with:
+- `harvested_institution_id` = 8 and `id` = 12345  
+  → Stats URL: `https://stats.figshare.com/melbourne/total/views/article/12345`
+
+For an item with:
+- `doi` = `10.25400/lincolnuninz.21358338.v1`  
+  → Fallback stats URL: `https://stats.figshare.com/lincolnuninz/total/views/article/12345`
 
 # Links
 
