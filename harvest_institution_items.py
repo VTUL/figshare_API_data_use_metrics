@@ -301,7 +301,12 @@ if __name__ == "__main__":
         for item in final_items:
             if 'files' in item:
                 del item['files']
-
+    
+        # REMOVE 'custom_fields' key from all items to avoid CSV line break issues
+        for item in final_items:
+            if 'custom_fields' in item:
+                del item['custom_fields']
+                
         # Save all enriched items to JSON and CSV
         today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         print(f'DEBUG: Saving files with date-time suffix: {today}')

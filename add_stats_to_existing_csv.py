@@ -8,6 +8,7 @@ import requests
 import json
 import os
 import re
+import csv
 
 import pandas as pd
 import datetime
@@ -201,6 +202,49 @@ def gather_statistics_for_items(items_list, institution_abbrevs=None):
             log_to_file(f'DEBUG: stats dict for Virginia Tech item: {stats}')
             all_stats.append(stats)
             continue
+        ########################################
+        # If institution_id is 510, use lincolnuninz since the other stats lincoln gives 0s but 200 response
+        if institution_id == 510:
+            print(f'DEBUG: Treating as Lincoln University (id=510) item')
+            log_to_file(f'DEBUG: Treating as Lincoln University (id=510) item')
+            views_url = f"https://stats.figshare.com/lincolnuninz/total/views/article/{item_id}"
+            downloads_url = f"https://stats.figshare.com/lincolnuninz/total/downloads/article/{item_id}"
+            print(f'DEBUG: views_url={views_url}, downloads_url={downloads_url}')
+            log_to_file(f'DEBUG: views_url={views_url}, downloads_url={downloads_url}')
+            try:
+                views_resp = requests.get(views_url)
+                print(f'DEBUG: views_resp.status_code={views_resp.status_code}')
+                log_to_file(f'DEBUG: views_resp.status_code={views_resp.status_code}')
+                downloads_resp = requests.get(downloads_url)
+                print(f'DEBUG: downloads_resp.status_code={downloads_resp.status_code}')
+                log_to_file(f'DEBUG: downloads_resp.status_code={downloads_resp.status_code}')
+                views = views_resp.json().get("totals") if views_resp.status_code == 200 else 'None'
+                downloads = downloads_resp.json().get("totals") if downloads_resp.status_code == 200 else 'None'
+                print(f'DEBUG: views={views}, downloads={downloads}')
+                log_to_file(f'DEBUG: views={views}, downloads={downloads}')
+            except Exception as e:
+                print(f"Error fetching stats for J-STAGE item {item_id}: {e}")
+                log_to_file(f"Error fetching stats for J-STAGE item {item_id}: {e}")
+                views = 'None'
+                downloads = 'None'
+            stats = {
+                'item_id': item_id,
+                'institution_id': institution_id,
+                'views_url_used': views_url,
+                'views_status_code': views_resp.status_code if 'views_resp' in locals() else None,
+                'views': views,
+                'downloads_url_used': downloads_url,
+                'downloads_status_code': downloads_resp.status_code if 'downloads_resp' in locals() else None,
+                'downloads': downloads
+            }
+            for k, v in item.items():
+                if k not in stats:
+                    stats[k] = v
+            print(f'DEBUG: stats dict for J-STAGE item: {stats}')
+            log_to_file(f'DEBUG: stats dict for J-STAGE item: {stats}')
+            all_stats.append(stats)
+            continue
+        ########################################
 
         # If institution_id is 791, treat as J-STAGE item
         if institution_id == 791:
@@ -439,6 +483,38 @@ def gather_statistics_for_items(items_list, institution_abbrevs=None):
     return all_stats
 
 
+def extract_domain(url):
+    # Extracts the domain from a full URL (e.g., https://repository.lboro.ac.uk)
+    if not url or not isinstance(url, str):
+        return ''
+    match = re.match(r'(https?://[^/]+)', url)
+    return match.group(1) if match else ''
+
+def save_unique_institutions(stats_list, output_csv='unique_institutions.csv'):
+    seen = set()
+    rows = []
+    for stat in stats_list:
+        name = stat.get('name', '')
+        institution_id = stat.get('institution_id', '')
+        figshare_url = extract_domain(stat.get('url_public_html', ''))
+        views_url = stat.get('views_url_used', '')
+        downloads_url = stat.get('downloads_url_used', '')
+        key = (name, institution_id, figshare_url, views_url, downloads_url)
+        if key not in seen:
+            seen.add(key)
+            rows.append({
+                'institution_name': name,
+                'institution_id': institution_id,
+                'figshare_url_domain': figshare_url,
+                'views_url': views_url,
+                'downloads_url': downloads_url
+            })
+    with open(output_csv, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=['institution_name', 'institution_id', 'figshare_url_domain', 'views_url', 'downloads_url'])
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f'✅ Unique institutions list saved to {output_csv}')
+
 def add_statistics_to_csv(csv_file_path, output_file_path=None):
     """
     Read an existing CSV file with harvested items and add statistics columns
@@ -454,7 +530,7 @@ def add_statistics_to_csv(csv_file_path, output_file_path=None):
         #Debug: Uncomment the following lines to filter for a specific institution or limit rows during testing
         ############################################################
         # Filter for only institution id 8 (University of Melbourne)
-        #df = df[df['harvested_institution_id'] == 935]
+        #df = df[df['harvested_institution_id'] == 510]
         #print(f'========== DEBUG: Filtered for institution_id=8, shape: {df.shape} =========')
         #df = df.head(1)  # Only process the first 30 rows
         ############################################################
@@ -558,6 +634,7 @@ def add_statistics_to_csv(csv_file_path, output_file_path=None):
             print(f'❌ ERROR: Failed to save CSV file: {e}')
             log_to_file(f'ERROR: Failed to save CSV file: {e}')
         return output_file_path
+    save_unique_institutions(stats_list)
     return output_file_path
 
 def main():
