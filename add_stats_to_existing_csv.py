@@ -647,7 +647,9 @@ def main():
     #input_csv='harvested_items_2025-09-01_17-23-30_fullmeta.csv'
     #input_csv='harvested_items_2025-09-09_15-46-06_fullmeta.csv'
     #input_csv='harvested_items_2025-09-09_17-45-43_fullmeta.csv'
-    input_csv='harvested_items_2025-09-11_23-14-18_fullmeta.csv'
+   # input_csv='harvested_items_2025-09-11_23-14-18_fullmeta.csv'
+    #input_csv='harvested_items_2025-09-15_19-41-50_fullmeta.csv'
+    input_csv='harvested_items_2025-09-16_09-32-27_fullmeta.csv'
     #input_csv= "harvested-items.csv"
     print(f'🚀 Starting statistics addition for: {input_csv}')
     #quit()

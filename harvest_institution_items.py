@@ -7,22 +7,24 @@ import datetime
 import os
 # Function to harvest all public items from figshare.com
 #def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", end_date="2022-12-31", max_pages=1000):
-def harvest_figshare_public_items(start_date, end_date, item_type, max_pages):
+def harvest_figshare_public_items(start_date, end_date, item_type, max_pages, batch_type='week'):
     BASE_URL = 'https://api.figshare.com/v2'
     results = []
-    # Split the date range into monthly batches
+    # Split the date range into weekly/monthly batches to avoid large result sets
     start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     batch_ranges = []
     current = start_dt
     while current < end_dt:
         batch_start = current
-        # Get last day of month
-        next_month = (batch_start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
-        batch_end = min(next_month - datetime.timedelta(days=1), end_dt)
+        if batch_type == 'week':
+            batch_end = min(batch_start + datetime.timedelta(days=6), end_dt)
+        else:  # fallback to monthly
+            next_month = (batch_start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+            batch_end = min(next_month - datetime.timedelta(days=1), end_dt)
         batch_ranges.append((batch_start.strftime("%Y-%m-%d"), batch_end.strftime("%Y-%m-%d")))
         current = batch_end + datetime.timedelta(days=1)
-    print(f"DEBUG: Batching into {len(batch_ranges)} monthly ranges: {batch_ranges}")
+    print(f"DEBUG: Batching into {len(batch_ranges)} {batch_type}ly ranges: {batch_ranges}")
     for batch_start, batch_end in batch_ranges:
         print(f"DEBUG: Harvesting batch {batch_start} to {batch_end}")
         query = {
@@ -237,8 +239,8 @@ if __name__ == "__main__":
         #figshare_items = harvest_figshare_public_items(start_date=start_date, end_date=end_date)
         max_pages = 1000  # Adjust as needed
         print(f'DEBUG: Calling harvest_figshare_public_items with start_date={start_date}, end_date={end_date}, item_type={item_type}, max_pages={max_pages}')
-        figshare_items = harvest_figshare_public_items(start_date, end_date,item_type,max_pages)
-        
+        figshare_items = harvest_figshare_public_items(start_date, end_date,item_type,max_pages, batch_type='week')
+
         print(f'DEBUG: Appending {len(figshare_items)} figshare.com items to harvested items')
 
         # Randomly select as many figshare.com items as institution items
