@@ -17,6 +17,9 @@ __pycache__
 # Allow only .py files
 !*.py
 
+# Allow the September bias-analysis folder (only its .py files, per the rule above)
+!sept_bias_analysis/
+
 # Ignore __pycache__ and compiled Python files
 __pycache__/
 *.pyc
@@ -27,3 +30,6 @@ harvest_institution_datasets_and_stats.py
 harvest_institution_items_oai.py
 institutionListOAI_update_notes.py
 stats_from_instID.py
+
+# Documentation / working notes folder (not tracked in git)
+documents/

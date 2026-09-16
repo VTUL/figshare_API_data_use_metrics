@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import datetime
 import time
-import sys
 
 # Helper function to also write to a log file
 import os
@@ -26,55 +25,6 @@ def load_figshare_token():
 FIGSHARE_TOKEN = load_figshare_token()
 FIGSHARE_HEADERS = {'Authorization': f'token {FIGSHARE_TOKEN}'} if FIGSHARE_TOKEN else {}
 print(f"DEBUG: Figshare API token {'loaded (authenticated requests)' if FIGSHARE_TOKEN else 'NOT found (using anonymous requests)'}")
-
-# Statuses that mean "rate-limited / temporary" and are worth waiting out.
-RETRYABLE_STATUSES = (403, 429, 500, 502, 503, 504)
-
-
-def post_with_retry(url, body, headers, label='', max_attempts=6, base_wait=30, max_wait=300):
-    """
-    POST a search request, retrying on rate-limit (403/429) and transient
-    server errors (5xx) with exponential backoff, so throttling becomes a WAIT
-    rather than a hard failure. Returns the final response object (which may be
-    non-200 if every attempt was exhausted). A Retry-After header is honored.
-    """
-    wait = base_wait
-    resp = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            resp = requests.post(url, json=body, headers=headers, timeout=60)
-        except Exception as e:
-            print(f"  {label}: request error ({e}); waiting {wait:.0f}s (attempt {attempt}/{max_attempts})")
-            time.sleep(wait)
-            wait = min(wait * 2, max_wait)
-            continue
-        if resp.status_code == 200:
-            return resp
-        if resp.status_code in RETRYABLE_STATUSES and attempt < max_attempts:
-            w = wait
-            retry_after = resp.headers.get('Retry-After')
-            if retry_after:
-                try:
-                    w = max(w, float(retry_after))
-                except ValueError:
-                    pass
-            print(f"  {label}: status {resp.status_code}; waiting {w:.0f}s then retrying (attempt {attempt}/{max_attempts})")
-            time.sleep(w)
-            wait = min(wait * 2, max_wait)
-            continue
-        return resp  # non-retryable status, or attempts exhausted
-    return resp
-
-
-def stop_and_resume(message):
-    """Print a clear message and exit WITHOUT losing checkpointed progress.
-    SystemExit is not caught by the main try/except, so this exits cleanly."""
-    print("\n" + "=" * 70)
-    print("STOPPING (progress is checkpointed - just re-run to resume):")
-    print(message)
-    print("=" * 70)
-    sys.exit(1)
-
 
 # Function to harvest all public items from figshare.com
 #def harvest_figshare_public_items(item_type="dataset", start_date="2022-01-01", end_date="2022-12-31", max_pages=1000):
@@ -126,18 +76,9 @@ def harvest_figshare_public_items(start_date, end_date, item_type, max_pages, ba
             body['page'] = page
             body['order'] = 'published_date'
             body['order_direction'] = 'asc'
-            response = post_with_retry(url, body, FIGSHARE_HEADERS,
-                                       label=f"public {batch_start}..{batch_end} p{page}")
+            response = requests.post(url, json=body, headers=FIGSHARE_HEADERS)
             print(f"Batch {batch_start} to {batch_end}, Page {page} status: {response.status_code}")
             if response.status_code != 200:
-                if response.status_code in RETRYABLE_STATUSES:
-                    # Sustained throttle/block even after retries. Stop cleanly so
-                    # we do NOT checkpoint an incomplete public pool. The pool is
-                    # only saved once fully harvested, so a re-run re-harvests it.
-                    stop_and_resume(
-                        f"Public search still returning {response.status_code} after retries at "
-                        f"batch {batch_start}..{batch_end} page {page}. Re-run later to resume.")
-                # other non-200 (e.g. a genuine bad request): skip this batch
                 print(f"Error on batch {batch_start} to {batch_end}, page {page}: {response.status_code}")
                 print("Request URL:", url)
                 print("Request payload:", body)
@@ -214,12 +155,21 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
     Harvest items for a specific institution
     """
     global newRecords, errorList
-
+    
     print(f'DEBUG: Starting harvest_institution_items for institution_id={institution_id}')
     print(f'DEBUG: Parameters - item_type={item_type}, start_date={start_date}, end_date={end_date}')
     print(f'Harvesting items for institution ID: {institution_id}')
     log_to_file(f'Harvesting items for institution ID: {institution_id}')
-
+    
+    # Build the search query
+   # query = {
+   #     "institution": int(institution_id),
+   #     "search_for": f":defined_type_name:{item_type} AND :posted_before:#{end_date} AND :posted_after:{start_date}"
+   # }
+    #query = {
+    #    "institution": int(institution_id)}
+    #start_date='2022-01-01'
+    #end_date='2022-12-31'
     print(f'DEBUG: Built query with institution_id={institution_id}, start_date={start_date}, end_date={end_date}')
     # :posted_before: is EXCLUSIVE, so query up to the day AFTER end_date to
     # include end_date itself (otherwise the final day is silently dropped).
@@ -228,10 +178,12 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
         "institution": int(institution_id),
         "search_for": f":item_type: dataset AND :posted_before: {end_before} AND :posted_after: {start_date}"
         }
-
+    
     print(f'DEBUG: Built query={query}')
     print(f'Search query: {query}')
     log_to_file(f'Search query: {query}')
+   # query is {"institution":153, "page_size":1}
+   # *********Search request URL: https://api.figshare.com/v2/articles/search with params: {'institution': 153, 'page_size': 1}
     page = 1
     total_items_for_institution = 0
     seen_ids_this_institution = set()
@@ -245,7 +197,8 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
         try:
             print(f'DEBUG: Starting page {page} request')
             print(f'Requesting page {page}...')
-
+            log_to_file(f'Requesting page {page}...')
+            
             # Make the API request with proper pagination.
             # page_size/page/order must be in the POST body - the API ignores
             # them in the URL query string and falls back to a small default
@@ -256,27 +209,29 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
             body['page'] = page
             body['order'] = 'published_date'
             body['order_direction'] = 'asc'
-            response = post_with_retry(url, body, FIGSHARE_HEADERS,
-                                       label=f"institution {institution_id} p{page}")
+            print(f'DEBUG: Making POST request to {url}')
+            response = requests.post(url, json=body, headers=FIGSHARE_HEADERS)  # Use json=body, not params
+            print('*********Search request URL:', url, 'with json:', body)
             print('Search request status:', response.status_code)
-
+            print(f'DEBUG: Response received, status_code={response.status_code}')
+            print(f'HTTP status code: {response.status_code}')
+            log_to_file(f'HTTP status code: {response.status_code}')
+            
             if response.status_code != 200:
-                if response.status_code in RETRYABLE_STATUSES:
-                    # Sustained throttle even after retries. Stop cleanly so we do
-                    # NOT checkpoint incomplete institution data (the institution
-                    # checkpoint is only written after ALL institutions finish).
-                    stop_and_resume(
-                        f"Institution search still returning {response.status_code} after retries "
-                        f"(institution {institution_id}, page {page}). Re-run later to resume.")
+                print(f'DEBUG: Non-200 status code, adding to error list')
                 error_desc = f'Error on page {page}: HTTP {response.status_code}'
                 print(error_desc)
                 log_to_file(error_desc)
                 errorList.append({'page': page, 'status_code': response.status_code, 'institution_id': institution_id})
                 break
-
+            
+            # Parse the response
+            print(f'DEBUG: Parsing JSON response')
             items = response.json()
-
+            print(f'DEBUG: JSON parsed, type={type(items)}, length={len(items) if isinstance(items, list) else "not a list"}')
+            
             if not items:
+                print(f'DEBUG: No items found, breaking loop')
                 print(f'No more items found. Harvesting complete for institution {institution_id}.')
                 log_to_file(f'No more items found. Harvesting complete for institution {institution_id}.')
                 break
@@ -291,24 +246,27 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
                 break
             seen_ids_this_institution |= current_ids
 
+            print(f'DEBUG: Processing {len(items)} items')
             print(f'Page {page}: {len(items)} items retrieved')
             log_to_file(f'Page {page}: {len(items)} items retrieved')
-
+            
             # Add institution_id to each item for tracking
+            items_processed = 0
             for item in items:
                 item['harvested_institution_id'] = institution_id
                 item['harvested_datetime'] = datetime.datetime.now().isoformat()
                 item['harvest_start_date'] = start_date
                 item['harvest_end_date'] = end_date
                 item['harvest_item_type'] = item_type
-
+                items_processed += 1
+            
+            print(f'DEBUG: Added metadata to {items_processed} items')
+            print(f'DEBUG: Adding {len(items)} items to newRecords')
             newRecords.extend(items)
             total_items_for_institution += len(items)
             print(f'DEBUG: Total items for institution {institution_id} so far: {total_items_for_institution}')
             page += 1
-
-        except SystemExit:
-            raise  # let a clean stop_and_resume() propagate
+            
         except Exception as e:
             print(f'DEBUG: Exception occurred: {type(e).__name__}: {str(e)}')
             error_desc = f'Exception on page {page}: {str(e)}'
@@ -316,7 +274,7 @@ def harvest_institution_items(institution_id, start_date, end_date, item_type):
             log_to_file(error_desc)
             errorList.append({'page': page, 'error': str(e), 'institution_id': institution_id})
             break
-
+    
     print(f'DEBUG: Harvest complete for institution {institution_id}')
     print(f'Institution {institution_id}: Total items harvested: {len([r for r in newRecords if r.get("harvested_institution_id") == institution_id])}')
     log_to_file(f'Institution {institution_id}: Total items harvested: {len([r for r in newRecords if r.get("harvested_institution_id") == institution_id])}')
@@ -334,192 +292,145 @@ def harvest_multiple_institutions(institution_ids, start_date, end_date, item_ty
         print(f'DEBUG: Completed institution {i+1}/{len(institution_ids)}: {inst_id}')
 
 
-def fetch_article_metadata(item_id, max_retries=6, base_wait=10, max_wait=300, request_delay=0.3):
+def fetch_article_metadata(item_id, max_retries=3, retry_wait=5, request_delay=0.3):
     """
-    Fetch full metadata for one article, with retry/backoff so rate-limiting
-    (403/429) or transient errors become a WAIT rather than a lost item.
-
-    Returns:
-      - the metadata dict on success,
-      - {} for a permanent 404 (item withdrawn) - do not retry it,
-      - None if it ultimately failed after retries (transient/throttle) - the
-        caller should NOT checkpoint it, so a resume retries it.
+    Fetch full metadata for one article. Waits request_delay seconds before
+    every attempt (to avoid triggering throttling), and on a non-200 response
+    retries with backoff (honoring a Retry-After header if the server sends
+    one) instead of giving up immediately. Returns the metadata dict on
+    success, or None if every attempt fails.
     """
     url = f"https://api.figshare.com/v2/articles/{item_id}"
-    wait = base_wait
-    resp = None
     for attempt in range(1, max_retries + 1):
         time.sleep(request_delay)
         try:
             resp = requests.get(url, timeout=30, headers=FIGSHARE_HEADERS)
         except Exception as e:
-            print(f"  metadata {item_id}: request error ({e}); waiting {wait:.0f}s (attempt {attempt}/{max_retries})")
-            time.sleep(wait)
-            wait = min(wait * 2, max_wait)
+            print(f"Error fetching metadata for item {item_id} (attempt {attempt}/{max_retries}): {e}")
+            time.sleep(retry_wait * attempt)
             continue
         if resp.status_code == 200:
             return resp.json()
-        if resp.status_code == 404:
-            # permanent - the article was withdrawn/deleted; do not retry
-            print(f"  metadata {item_id}: 404 (withdrawn/not found), skipping")
-            return {}
         if attempt < max_retries:
-            w = wait
+            wait = retry_wait * attempt
             retry_after = resp.headers.get('Retry-After')
             if retry_after:
                 try:
-                    w = max(w, float(retry_after))
+                    wait = max(wait, float(retry_after))
                 except ValueError:
                     pass
-            print(f"  metadata {item_id}: status {resp.status_code} (attempt {attempt}/{max_retries}), waiting {w:.0f}s")
-            time.sleep(w)
-            wait = min(wait * 2, max_wait)
+            print(f"Warning: item {item_id} status {resp.status_code} (attempt {attempt}/{max_retries}), retrying in {wait:.0f}s")
+            time.sleep(wait)
         else:
-            print(f"Warning: could not fetch metadata for item {item_id}, status {resp.status_code} (gave up after {max_retries} attempts)")
+            print(f"Warning: Could not fetch full metadata for item {item_id}, status {resp.status_code} (gave up after {max_retries} attempts)")
     return None
-
-
-def enrich_with_checkpoint(items, checkpoint_path, label, consecutive_fail_limit=25):
-    """
-    Fetch full metadata for each item, CHECKPOINTING every completed item to a
-    JSONL file so an interrupted run RESUMES instead of restarting. Items whose
-    id is already in the checkpoint are loaded and skipped.
-
-    If many items in a row fail (likely a sustained/daily rate-limit block), we
-    stop the whole run cleanly - the checkpoint holds all progress, so you just
-    re-run to resume from where it stopped.
-    """
-    done = {}
-    if os.path.exists(checkpoint_path):
-        with open(checkpoint_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                    done[rec.get('id')] = rec
-                except Exception:
-                    pass
-        print(f"Resuming {label}: {len(done)} items already enriched (from {checkpoint_path})")
-
-    result = []
-    consecutive_fail = 0
-    with open(checkpoint_path, 'a', encoding='utf-8') as ckpt:
-        for idx, item in enumerate(items):
-            item_id = item.get('id')
-            if item_id in done:
-                result.append(done[item_id])
-                continue
-
-            full_meta = fetch_article_metadata(item_id) if item_id else {}
-
-            if full_meta is None:
-                # transient failure (throttle give-up) - do NOT checkpoint, so
-                # it will be retried on the next resume.
-                result.append(item)
-                consecutive_fail += 1
-                if consecutive_fail >= consecutive_fail_limit:
-                    stop_and_resume(
-                        f"{consecutive_fail} {label} metadata fetches failed in a row - likely a "
-                        f"sustained/daily rate-limit block. Already-fetched items are saved in "
-                        f"{checkpoint_path}. Re-run later to resume from here.")
-            else:
-                if full_meta:  # non-empty dict = real metadata (200)
-                    item.update(full_meta)
-                # drop bulky keys that also break the CSV; they are unused
-                for junk in ('files', 'custom_fields'):
-                    item.pop(junk, None)
-                result.append(item)
-                consecutive_fail = 0
-                ckpt.write(json.dumps(item, default=str) + '\n')
-                ckpt.flush()
-
-            if (idx + 1) % 100 == 0:
-                print(f"Enriched {idx+1}/{len(items)} {label} items...")
-    return result
 
 
 # Example usage
 if __name__ == "__main__":
     print('DEBUG: Starting main execution')
     # Fix the random seed once, up front, so the random control-group sample
-    # below is reproducible AND stable across resumes (same pool -> same sample).
+    # below is reproducible. NOTE: this only reproduces the SELECTION; to let
+    # someone reproduce the exact sample you must also archive the harvested
+    # pool file (figshare_public_items_*.json), since the live API changes.
     import random
     random.seed(42)
-
-    # Checkpoint files - let the run resume instead of restarting.
-    INSTITUTION_CKPT = 'checkpoint_institution_records.json'
-    POOL_CKPT = 'checkpoint_public_pool.json'
-    INST_ENRICH_CKPT = 'checkpoint_enriched_institution.jsonl'
-    PUB_ENRICH_CKPT = 'checkpoint_enriched_public.jsonl'
-
+    # Read institution IDs from Excel file (adjust sheet and column names as needed)
     try:
+        #excel_file = 'institutionListOAI_20250730.xlsx'
         excel_file = 'institutionListOAI.xlsx'
         print(f'DEBUG: Reading Excel file: {excel_file}')
         inst_df = pd.read_excel(excel_file, sheet_name=2)
         df0 = pd.read_excel(excel_file, sheet_name=0)
         print(f'DEBUG: Excel file read successfully, shape: {inst_df.shape}')
-
+        print(f'DEBUG: Column names: {inst_df.columns.tolist()}')
+        
+        # Debug: Print first few rows
+        print('DEBUG: First 5 rows of data:')
+        print(inst_df.head())
+        
+        #institution_ids = inst_df['institution_id'].dropna().astype(int).astype(str).tolist()[:5]  # Test with first 5
+        #institution_ids = inst_df['institution_id'].dropna().astype(int).astype(str).tolist()[:1]  # Test with first 5
+        #institution_ids = inst_df['institution_id'].dropna().astype(int).astype(str).tolist()[:1]  # Test with first 5
         institution_ids = inst_df['institution_id'].dropna().astype(int).astype(str).tolist()  # All institutions
+        print(f'DEBUG: Extracted institution IDs: {institution_ids}')
+        print(f"Extracted institution IDs: {institution_ids}")
         print(f"Number of institution IDs: {len(institution_ids)}")
 
-        start_date = "2022-01-01"
-        end_date = "2022-12-31"
+        print(f"DEBUG: Starting harvest for {len(institution_ids)} institutions...")
+        print(f"Starting harvest for {len(institution_ids)} institutions...")
+        log_to_file(f"Starting harvest for {len(institution_ids)} institutions...")
+        
+        # Harvest items for institutions
+        print('DEBUG: Calling harvest_multiple_institutions')
+        start_date = "2022-09-01"   # SEPTEMBER-ONLY run (full run uses 2022-01-01)
+        end_date = "2022-09-30"     # SEPTEMBER-ONLY run (full run uses 2022-12-31)
         item_type = "dataset"
+        harvest_multiple_institutions(institution_ids, start_date, end_date, item_type)
+        print('DEBUG: harvest_multiple_institutions completed')
+        print(f'DEBUG: Final counts - newRecords: {len(newRecords)}, errorList: {len(errorList)}')
+        print(f'Harvesting complete. Total items collected: {len(newRecords)}')
+        print(f'There were {len(errorList)} errors.')
+        log_to_file(f'Harvesting complete. Total items collected: {len(newRecords)}')
+        log_to_file(f'There were {len(errorList)} errors.')
+        # Merge in columns from sheet 0 to newRecords before saving
+        key_col = 'institution_id' if 'institution_id' in df0.columns else 'instution_id'
+        # Build a mapping from institution_id to all columns in df0 (except the key)
+        df0_map = df0.set_index(key_col).to_dict(orient='index')
+        for rec in newRecords:
+            inst_id = int(rec['harvested_institution_id'])
+            if inst_id in df0_map:
+                for k, v in df0_map[inst_id].items():
+                    if k not in rec:
+                        rec[k] = v
+        # Harvest figshare.com public items and append to results
+        print('DEBUG: Harvesting figshare.com public items')
+        #figshare_items = harvest_figshare_public_items()
+        #figshare_items = harvest_figshare_public_items(start_date=start_date, end_date=end_date)
+        max_pages = 1000  # Adjust as needed
+        print(f'DEBUG: Calling harvest_figshare_public_items with start_date={start_date}, end_date={end_date}, item_type={item_type}, max_pages={max_pages}')
+        figshare_items = harvest_figshare_public_items(start_date, end_date,item_type,max_pages, batch_type='week')
 
-        # --- Phase 1: institution items (checkpointed) ---
-        if os.path.exists(INSTITUTION_CKPT):
-            with open(INSTITUTION_CKPT, 'r', encoding='utf-8') as f:
-                newRecords[:] = json.load(f)
-            print(f"Resuming: loaded {len(newRecords)} institution records from {INSTITUTION_CKPT}")
-        else:
-            print(f"Starting harvest for {len(institution_ids)} institutions...")
-            log_to_file(f"Starting harvest for {len(institution_ids)} institutions...")
-            harvest_multiple_institutions(institution_ids, start_date, end_date, item_type)
-            print(f'Harvesting complete. Total institution items collected: {len(newRecords)}')
-            print(f'There were {len(errorList)} errors.')
-            # Merge in columns from sheet 0 to newRecords before saving
-            key_col = 'institution_id' if 'institution_id' in df0.columns else 'instution_id'
-            df0_map = df0.set_index(key_col).to_dict(orient='index')
-            for rec in newRecords:
-                inst_id = int(rec['harvested_institution_id'])
-                if inst_id in df0_map:
-                    for k, v in df0_map[inst_id].items():
-                        if k not in rec:
-                            rec[k] = v
-            with open(INSTITUTION_CKPT, 'w', encoding='utf-8') as f:
-                json.dump(newRecords, f, default=str)
-            print(f"Checkpoint saved: {len(newRecords)} institution records -> {INSTITUTION_CKPT}")
+        print(f'DEBUG: Appending {len(figshare_items)} figshare.com items to harvested items')
 
-        # --- Phase 2: public pool (checkpointed) ---
-        if os.path.exists(POOL_CKPT):
-            with open(POOL_CKPT, 'r', encoding='utf-8') as f:
-                figshare_items = json.load(f)
-            print(f"Resuming: loaded {len(figshare_items)} public pool items from {POOL_CKPT}")
-        else:
-            print('DEBUG: Harvesting figshare.com public items')
-            max_pages = 1000
-            figshare_items = harvest_figshare_public_items(start_date, end_date, item_type, max_pages, batch_type='week')
-            with open(POOL_CKPT, 'w', encoding='utf-8') as f:
-                json.dump(figshare_items, f, default=str)
-            print(f"Checkpoint saved: {len(figshare_items)} public pool items -> {POOL_CKPT}")
-
-        # Randomly select as many figshare.com items as institution items.
-        # Deterministic (seed 42 + same pool) so the sample is identical across resumes.
+        # Randomly select as many figshare.com items as institution items
         n_institution = len(newRecords)
         print(f"DEBUG: Number of institution items: {n_institution}")
+        figshare_sample = []
         if len(figshare_items) >= n_institution:
+            import random
             figshare_sample = random.sample(figshare_items, n_institution)
         else:
             figshare_sample = figshare_items.copy()
         print(f"DEBUG: Randomly selected {len(figshare_sample)} figshare.com items for full metadata fetch")
 
-        # --- Phase 3: enrich metadata (checkpointed, resumable) ---
+        # Fetch full metadata for institution items
         print('DEBUG: Fetching full metadata for institution items')
-        enriched_institution_items = enrich_with_checkpoint(newRecords, INST_ENRICH_CKPT, 'institution')
+        enriched_institution_items = []
+        for idx, item in enumerate(newRecords):
+        #for idx, item in enumerate(newRecords[:5]): #for testing 1
+            item_id = item.get('id')
+            if item_id:
+                full_meta = fetch_article_metadata(item_id)
+                if full_meta:
+                    item.update(full_meta)
+            enriched_institution_items.append(item)
+            if (idx+1) % 100 == 0:
+                print(f"Fetched metadata for {idx+1} institution items...")
+
+        # Fetch full metadata for the sampled figshare.com items
         print('DEBUG: Fetching full metadata for sampled figshare.com items')
-        enriched_figshare_sample = enrich_with_checkpoint(figshare_sample, PUB_ENRICH_CKPT, 'public')
+        enriched_figshare_sample = []
+        for idx, item in enumerate(figshare_sample):
+        #for idx, item in enumerate(figshare_sample[:5]):
+            item_id = item.get('id')
+            if item_id:
+                full_meta = fetch_article_metadata(item_id)
+                if full_meta:
+                    item.update(full_meta)
+            enriched_figshare_sample.append(item)
+            if (idx+1) % 100 == 0:
+                print(f"Fetched metadata for {idx+1} figshare.com items...")
 
         # Combine enriched institution items and enriched sampled figshare.com items
         final_items = enriched_institution_items + enriched_figshare_sample
@@ -537,38 +448,45 @@ if __name__ == "__main__":
             print(f'DEBUG: Removed {len(final_items) - len(deduped_items)} duplicate items by id')
         final_items = deduped_items
 
-        # REMOVE 'files' / 'custom_fields' keys to avoid CSV line break issues
-        # (enrich_with_checkpoint already strips these, but be safe for any
-        # items that were loaded from an older checkpoint).
+        # REMOVE 'files' key from all items to avoid CSV line break issues
         for item in final_items:
-            item.pop('files', None)
-            item.pop('custom_fields', None)
-
+            if 'files' in item:
+                del item['files']
+    
+        # REMOVE 'custom_fields' key from all items to avoid CSV line break issues
+        for item in final_items:
+            if 'custom_fields' in item:
+                del item['custom_fields']
+                
         # Save all enriched items to JSON and CSV
         today = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         print(f'DEBUG: Saving files with date-time suffix: {today}')
         json_file = f'harvested_items_{today}_fullmeta.json'
+        print(f'DEBUG: Saving JSON file: {json_file}')
         with open(json_file, 'w') as f:
-            json.dump(final_items, f, indent=2, default=str)
+            json.dump(final_items, f, indent=2)
         csv_file = f'harvested_items_{today}_fullmeta.csv'
+        print(f'DEBUG: Saving CSV file: {csv_file}')
         df_items = pd.DataFrame(final_items)
         df_items.to_csv(csv_file, index=False)
         print(f'DEBUG: CSV file saved, shape: {df_items.shape}')
+        print('DEBUG: All operations completed successfully')
         print('All data saved to files.')
         log_to_file('All data saved to files.')
-
-        # Success - remove checkpoints so the NEXT run starts fresh rather than
-        # resuming from this (now-complete) run.
-        for ckpt_file in [INSTITUTION_CKPT, POOL_CKPT, INST_ENRICH_CKPT, PUB_ENRICH_CKPT]:
-            try:
-                if os.path.exists(ckpt_file):
-                    os.remove(ckpt_file)
-            except Exception:
-                pass
-        print('DEBUG: Checkpoints cleaned up after successful completion.')
-
+        
     except Exception as e:
         print(f'DEBUG: Exception in main: {type(e).__name__}: {str(e)}')
-        print(f'Error in main: {e}')
-        log_to_file(f'Error in main: {e}')
-        raise
+        print(f'Error reading institution file: {e}')
+        log_to_file(f'Error reading institution file: {e}')
+        
+        # Example with single institution ID for testing
+        #test_institution_id = "123"  # Replace with actual institution ID
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
+        #print(f'DEBUG: Running test with institution ID: {test_institution_id}')
+        #harvest_institution_items(test_institution_id)
+        #print(f'Test harvest complete. Items collected: {len(newRecords)}')
